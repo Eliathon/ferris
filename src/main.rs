@@ -1,3 +1,5 @@
+mod commands;
+
 use std::env;
 
 use dotenvy::dotenv;
@@ -5,6 +7,8 @@ use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
+
+use crate::commands::math::*;
 
 struct Handler;
 
@@ -17,6 +21,15 @@ impl EventHandler for Handler {
             }
             println!("Received a ping command from {}", msg.author.name);
         }
+        if msg.content.starts_with("!math ") {
+            let mut input = msg.content.split_whitespace().collect::<Vec<_>>();
+            println!("{:?}", input);
+            input.remove(0); // Remove !math
+            let response = parse_math_command(input).await.unwrap_or_else(|e| format!("Error: {}", e));
+            if let Err(why) = msg.channel_id.say(&ctx.http, response).await {
+                println!("Error sending message: {:?}", why);
+            }
+        }
     }
 
     async fn ready(&self, _: Context, ready: Ready) {
@@ -26,7 +39,7 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
-    dotenv().ok();
+    dotenv().ok().expect("Could not load .env file");
     let token = env::var("DISCORD_TOKEN")
         .expect("Expected a token in the environment");
     let intents = GatewayIntents::GUILD_MESSAGES
