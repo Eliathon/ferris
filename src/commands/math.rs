@@ -1,9 +1,3 @@
-use serenity::framework::standard::macros::command;
-use serenity::model::prelude::*;
-use serenity::prelude::*;
-use serenity::framework::standard::{Args, CommandResult};
-use poise::serenity_prelude as serenity;
-
 pub async fn parse_math_command(vec: Vec<&str>) -> Result<String, String> {
     if vec.len() != 3 {
         return Err("Invalid expression, use format <a>space<operator>space<b>".into());

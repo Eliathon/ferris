@@ -23,7 +23,6 @@ impl EventHandler for Handler {
         }
         if msg.content.starts_with("!math ") {
             let mut input = msg.content.split_whitespace().collect::<Vec<_>>();
-            println!("{:?}", input);
             input.remove(0); // Remove !math
             let response = parse_math_command(input).await.unwrap_or_else(|e| format!("Error: {}", e));
             if let Err(why) = msg.channel_id.say(&ctx.http, response).await {
