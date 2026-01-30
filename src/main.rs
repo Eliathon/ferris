@@ -9,13 +9,14 @@ use serenity::{model::prelude::*, prelude::GatewayIntents};
 use songbird::SerenityInit;
 
 use crate::commands::math::*;
+use crate::commands::voice::*;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 pub struct Data;
 
 type PoiseContext<'a> = poise::Context<'a, Data, Error>;
 
-#[poise::command(prefix_command, slash_command)]
+#[poise::command(prefix_command)]
 async fn ping(ctx: PoiseContext<'_>) -> Result<(), Error> {
     ctx.say("Pong!").await?;
     Ok(())
@@ -37,49 +38,35 @@ pub async fn math(ctx: PoiseContext<'_>, a: i32, op: String, b: i32) -> Result<(
 #[poise::command(prefix_command, guild_only)]
 pub async fn join(ctx: PoiseContext<'_>) -> Result<(), Error> {
     let serenity_ctx = ctx.serenity_context();
-    
-    let guild_id = match ctx.guild_id() {
-        Some (guild) => guild,
-        None => {
-            ctx.reply("This command can only be used in a server.").await?;
-            return Ok(());
+    let guild_id = ctx.guild_id().unwrap();
+    let user_id = ctx.author().id;
+
+    match join_voice_channel(serenity_ctx, guild_id, user_id).await {
+        Ok(channel_id) => {
+            ctx.reply(format!("Joined {}!", channel_id.mention()))
+                .await?;
         }
-    };
-    
-    let channel_id_opt: Option<ChannelId> = {
-        match guild_id.to_guild_cached(&serenity_ctx.cache) {
-            Some(guild) => guild.voice_states.get(&ctx.author().id).and_then(|vs| vs.channel_id),
-            None => None,
+        Err(msg) => {
+            ctx.reply(msg).await?;
         }
-    };
-    
-    if guild_id.to_guild_cached(&serenity_ctx.cache).is_none() {
-        ctx.reply("Could not retrieve guild information from cache.")
-            .await?;
-        return Ok(());
+    }
+    Ok(())
+}
+
+#[poise::command(prefix_command, guild_only)]
+pub async fn leave(ctx: PoiseContext<'_>) -> Result<(), Error> {
+    let serenity_ctx = ctx.serenity_context();
+    let guild_id = ctx.guild_id().unwrap();
+
+    match leave_voice_channel(serenity_ctx, guild_id).await {
+        Ok(()) => {
+            ctx.reply("Left the channel.").await?;
+        }
+        Err(msg) => {
+            ctx.reply(msg).await?;
+        }
     }
 
-    let channel_id = match channel_id_opt {
-        Some(c) => c,
-        None => {
-            ctx.reply("You need to be in a voice channel to use this command.")
-                .await?;
-
-            println!("Guild ID: {}", guild_id);
-            println!("Channel: {}", ctx.channel_id());
-            println!("author: {}", ctx.author().id);
-            return Ok(());
-        }
-    };
-
-    let manager = songbird::get(serenity_ctx)
-        .await
-        .ok_or("Songbird Voice client placed in at initialisation.")?;
-
-    manager.join(guild_id, channel_id).await?;
-
-    ctx.reply(format!("Joined {}!", channel_id.mention()))
-        .await?;
     Ok(())
 }
 
@@ -96,7 +83,7 @@ async fn main() -> Result<(), Error> {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![join(), ping(), math()],
+            commands: vec![join(), leave(), ping(), math()],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("!".into()),
                 ..Default::default()
